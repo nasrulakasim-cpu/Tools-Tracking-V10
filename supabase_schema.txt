@@ -1,0 +1,111 @@
+-- 1. CLEANUP (Optional: Reset tables if they exist)
+DROP TABLE IF EXISTS requests;
+DROP TABLE IF EXISTS inventory;
+DROP TABLE IF EXISTS users;
+
+-- 2. CREATE USERS TABLE
+CREATE TABLE users (
+    "id" TEXT PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "username" TEXT NOT NULL,
+    "role" TEXT NOT NULL,
+    "base" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "password" TEXT
+);
+
+-- 3. CREATE INVENTORY TABLE
+-- Matches the new 20-column mapping plus internal tracking fields
+CREATE TABLE inventory (
+    "id" TEXT PRIMARY KEY,
+    "no" TEXT,
+    "description" TEXT,
+    "currentLocation" TEXT,    -- ITEM LOCATION (Column 3)
+    "personInCharge" TEXT,     -- PERSON IN CHARGE (Column 4)
+    "lastMovementDate" TEXT,   -- DATE OUT/MOVED (Column 5)
+    "maker" TEXT,              -- Maker / Brand (Column 6)
+    "range" TEXT,              -- Range / Capacity (Column 7)
+    "typeModel" TEXT,          -- Type / Model (Column 8)
+    "serialNo" TEXT,           -- Serial No. (Column 9)
+    "unitPrice" TEXT,          -- Unit Price (Column 10)
+    "date" TEXT,               -- PURCHASE DATE (Column 11)
+    "poNo" TEXT,               -- P.O. No. (Column 12)
+    "quantity" INTEGER,        -- Quantity (Column 13)
+    "assetNo" TEXT,            -- Asset No. (Column 14)
+    "location" TEXT,           -- STORE LOCATION (Column 15)
+    "equipmentStatus" TEXT,    -- EQUIPMENT STATUS (Column 16)
+    "documentStatus" TEXT,     -- DOCUMENT STATUS (Column 17)
+    "dateOfQfRecorded" TEXT,   -- DATE OF QF RECORDED (Column 18)
+    "hsemCategory" TEXT,       -- HSEM Category (Column 19)
+    "remarks" TEXT,            -- Remarks (Column 20)
+    "physicalStatus" TEXT,     -- Supplemental data
+    "base" TEXT NOT NULL       -- Site reference (e.g., Lemal, Paka)
+);
+
+-- 4. CREATE REQUESTS TABLE
+CREATE TABLE requests (
+    "id" TEXT PRIMARY KEY,
+    "type" TEXT NOT NULL,
+    "staffId" TEXT NOT NULL,
+    "staffName" TEXT NOT NULL,
+    "storekeeperId" TEXT,
+    "managerId" TEXT,
+    "base" TEXT NOT NULL,
+    "items" JSONB NOT NULL,
+    "status" TEXT NOT NULL,
+    "timestamp" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    "rejectionReason" TEXT,
+    "targetLocation" TEXT,
+    "targetDate" TEXT
+);
+
+-- 5. INSERT MOCK DATA (USERS)
+INSERT INTO users ("id", "name", "username", "role", "base", "email", "password") VALUES
+('u1', 'Alice Admin', 'admin', 'ADMIN', 'HQ', 'alice@company.com', '12345'),
+('u2', 'Bob Staff', 'staff', 'STAFF', 'Lemal', 'bob@company.com', '12345'),
+('u3', 'Charlie Storekeeper', 'storekeeper', 'STOREKEEPER', 'Lemal', 'charlie@company.com', '12345'),
+('u4', 'David Staff', 'david', 'STAFF', 'PD', 'david@company.com', '12345'),
+('u5', 'Eve Storekeeper', 'eve', 'STOREKEEPER', 'PD', 'eve@company.com', '12345'),
+('u6', 'Frank Manager', 'manager', 'BASE_MANAGER', 'Lemal', 'frank@company.com', '12345');
+
+-- 6. INSERT MOCK DATA (INVENTORY)
+-- Examples updated to match the new schema structure
+INSERT INTO inventory (
+    "id", "no", "description", "currentLocation", "personInCharge", "lastMovementDate", 
+    "maker", "range", "typeModel", "serialNo", "unitPrice", "date", "poNo", 
+    "quantity", "assetNo", "location", "equipmentStatus", "documentStatus", 
+    "dateOfQfRecorded", "hsemCategory", "remarks", "physicalStatus", "base"
+) VALUES
+('lml-001', '1', 'Impact Drill 18V LXT', 'In Store', NULL, NULL, 
+ 'Makita', '0-2000 RPM', 'DHP482Z', 'MK-882910', '450.00', '12/01/2023', 'PO-23-LML-01', 
+ 1, 'AST-LML-T01', 'Rack A-01', 'OK', '-', '-', 'Power Tools', 'Battery checked ok', 'Good', 'Lemal'),
+
+('lml-002', '2', 'Digital Multimeter', 'In Store', NULL, NULL, 
+ 'Fluke', '1000V', '179 True RMS', 'FL-992834', '1200.00', '15/02/2023', 'PO-23-LML-02', 
+ 1, 'AST-LML-I01', 'Cabinet C2', 'OK', '-', '-', 'Instruments', 'Calibration due Dec 2024', 'Good', 'Lemal'),
+
+('lml-003', '3', 'Safety Harness Full Body', 'Project Site Alpha', 'Bob Staff', '2023-10-25', 
+ '3M', '100kg', 'Protecta', '3M-SH-771', '350.00', '10/03/2023', 'PO-23-LML-03', 
+ 1, 'AST-LML-S01', 'Rack B-03', 'OK', '-', '-', 'PPE', 'Used for roof inspection', 'Good', 'Lemal'),
+
+('lml-004', '4', 'Angle Grinder 4"', 'In Store', NULL, NULL, 
+ 'Bosch', '720W', 'GWS 7-100', 'BS-GR-112', '280.00', '05/04/2023', 'PO-23-LML-04', 
+ 1, 'AST-LML-T02', 'Rack A-02', 'ROSAK', '-', '-', 'Power Tools', 'Sent for repair 01/11', 'Switch Broken', 'Lemal'),
+
+('lml-005', '5', 'Hydraulic Jack', 'In Store', NULL, NULL, 
+ 'Masada', '10 Ton', 'MH-10', 'MS-HJ-009', '650.00', '20/05/2023', 'PO-23-LML-05', 
+ 1, 'AST-LML-M01', 'Floor Area D', 'DIBAIKI', '-', '-', 'Machinery', 'Oil level checked', 'Scratched', 'Lemal'),
+
+('lml-006', '6', 'Welding Set Inverter', 'In Store', NULL, NULL, 
+ 'Lincoln Electric', '200A', 'Invertec V205', 'LE-WS-554', '3500.00', '12/06/2023', 'PO-23-LML-06', 
+ 1, 'AST-LML-W01', 'Rack E-01', 'SKRAP', '-', '-', 'Welding', '', 'Good', 'Lemal');
+
+-- 7. ENABLE ROW LEVEL SECURITY
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory ENABLE ROW LEVEL SECURITY;
+ALTER TABLE requests ENABLE ROW LEVEL SECURITY;
+
+-- Create policies to allow all access (For development purposes only)
+CREATE POLICY "Allow all access to users" ON users FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all access to inventory" ON inventory FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all access to requests" ON requests FOR ALL USING (true) WITH CHECK (true);
