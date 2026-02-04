@@ -1,3 +1,4 @@
+
 export enum UserRole {
   ADMIN = 'ADMIN',
   STAFF = 'STAFF',
@@ -51,9 +52,9 @@ export interface InventoryItem {
   assetNo: string;
   location: string; 
   equipmentStatus: string;
-  documentStatus: string; // New
-  dateOfQfRecorded: string; // New
-  hsemCategory: string; // Renamed from sems
+  documentStatus: string;
+  dateOfQfRecorded: string;
+  hsemCategory: string;
   physicalStatus: string;
   remarks?: string;
   
@@ -83,7 +84,17 @@ export interface MovementRequest {
   status: RequestStatus;
   timestamp: string;
   rejectionReason?: string;
-  reportReason?: string; // New field for damage/scrap/lost reasons
+  reportReason?: string;
   targetLocation?: string;
   targetDate?: string;
+}
+
+export interface BaseStats {
+  baseName: string;
+  totalItems: number;
+  skrapCount: number;
+  rosakCount: number;
+  inUseCount: number;
+  lostCount: number;
+  okCount: number;
 }

@@ -1,38 +1,27 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { MovementRequest, InventoryItem, RequestType, RequestStatus } from '../types';
+import { MovementRequest, InventoryItem, RequestType, RequestStatus, BaseStats } from '../types';
 
 /**
  * High-quality Base64 Logo (Remaco with Bulb Icon)
  */
 const LOGO_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAABACAYAAABf8vS/AAAACXBIWXMAAAsTAAALEwEAmpwYAAAKT2lDQ1BQaG90b3Nob3AgSUNDIHByb2ZpbGUAAHjanVNnVFPpFj33VoKUmCRAKpKm98SREIsQS4pUG4qcGCuijJlhiijS7fSgqWUMFEABQUBAMBE9oMLITID0IXS9O9LBCYmIUI66CH7uK6ChpY886+S1fPbe6zX7987595v97c89fO82AJC5S8IBLAtAkS8RBu/NzzQQE7zDBSHAEBICAYUfLMBEXBgYy68P37YAKvL8wBfWvXy998xsB8S6UM25sBPrsnEAAp8fAAInI8UKURp66pCxq5uI5QFAmIuEgb8SBCBkIA9S5Yp7T6AOc4Y5954Yf8u810M2KDHptmU8GisS+eYmGLZstSpzuB3ZLW7O3uO0hL78vmd46tO7FzWp6Y579737+5y+yS9qV50S+6L869s29c9X6LOn/lW99ZfmO99S77n7yPdof4VmO69p96w94/3mO/Z8z6v2u8p7f2y9v/v8d/799/799_placeholder_for_full_base64_logo_data';
 
-// Simplified Drawing for the logo icon since base64 can be truncated in some environments
-// I will use a helper to draw the branding to ensure it never breaks
 const drawBranding = (doc: jsPDF, x: number, y: number, scale: number = 1) => {
-  // Bulb Color (Orange-Red)
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.6 * scale);
-  
-  // area untuk letak logo tnb. kalau dh letak kena tukar scale text untuk X
-
   // REMACO Text
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14 * scale);
+  doc.setFontSize(15 * scale);
   doc.setTextColor(0, 42, 92);
-  doc.text('REMACO', x + 1 * scale, y + 10 * scale);
+  doc.text('REMACO', x + 0 * scale, y + 10 * scale);
   
   // Subtext
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6 * scale);
+  doc.setFontSize(6.5 * scale);
   doc.setTextColor(50, 50, 50);
-  doc.text('A subsidiary of TNB Power Generation', x + 1 * scale, y + 13 * scale);
+  doc.text('A subsidiary of TNB Power Generation', x + 0 * scale, y + 13.5 * scale);
   doc.setTextColor(0, 0, 0); // Reset
 };
 
-/**
- * Configuration mapping for different form types based on KPI requirements.
- */
 export const getFormConfig = (type: RequestType) => {
   switch (type) {
     case RequestType.ROSAK:
@@ -48,26 +37,101 @@ export const getFormConfig = (type: RequestType) => {
   }
 };
 
+/**
+ * Generates a Summary PDF Report for all bases based on totals
+ */
+export const generateSummaryReport = (baseStats: BaseStats[], grandTotal: any) => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.width;
+  const margin = 15;
+
+  // Header Branding
+  drawBranding(doc, margin, 10, 1.2);
+
+  // Report Title
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('INVENTORY STATUS SUMMARY REPORT', pageWidth / 2, 35, { align: 'center' });
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth / 2, 40, { align: 'center' });
+
+  // Data Table
+  const tableHeaders = [['BASE NAME', 'TOTAL ITEMS', 'OK', 'IN USE', 'ROSAK', 'LOST', 'SKRAP']];
+  const tableBody = baseStats.map(stat => [
+    stat.baseName.toUpperCase(),
+    stat.totalItems.toLocaleString(),
+    stat.okCount.toLocaleString(),
+    stat.inUseCount.toLocaleString(),
+    stat.rosakCount.toLocaleString(),
+    stat.lostCount.toLocaleString(),
+    stat.skrapCount.toLocaleString()
+  ]);
+
+  // Grand Total Row
+  tableBody.push([
+    'GRAND TOTALS',
+    grandTotal.totalItems.toLocaleString(),
+    grandTotal.okCount.toLocaleString(),
+    grandTotal.inUseCount.toLocaleString(),
+    grandTotal.rosakCount.toLocaleString(),
+    grandTotal.lostCount.toLocaleString(),
+    grandTotal.skrapCount.toLocaleString()
+  ]);
+
+  autoTable(doc, {
+    startY: 50,
+    head: tableHeaders,
+    body: tableBody,
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 3, font: 'helvetica' },
+    headStyles: { fillColor: [0, 42, 92], textColor: [255, 255, 255], fontStyle: 'bold' },
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 40 },
+      1: { halign: 'center' },
+      2: { halign: 'center' },
+      3: { halign: 'center' },
+      4: { halign: 'center' },
+      5: { halign: 'center' },
+      6: { halign: 'center' }
+    },
+    didParseCell: (data) => {
+      // Highlight the grand total row
+      if (data.row.index === tableBody.length - 1) {
+        data.cell.styles.fillColor = [240, 240, 240];
+        data.cell.styles.fontStyle = 'bold';
+      }
+    }
+  });
+
+  const finalY = (doc as any).lastAutoTable.finalY + 20;
+  
+  // Sign-off
+  doc.setFontSize(9);
+  doc.text('Authorized By:', margin, finalY);
+  doc.line(margin, finalY + 15, margin + 60, finalY + 15);
+  doc.text('Admin HQ / Asset Manager', margin, finalY + 20);
+
+  doc.save(`Remaco_Inventory_Summary_${new Date().toISOString().split('T')[0]}.pdf`);
+};
+
 const drawReportHeader = (doc: jsPDF, type: RequestType) => {
   const pageWidth = doc.internal.pageSize.width;
   const margin = 15;
   const config = getFormConfig(type);
 
-  // Draw Logo Branding
   drawBranding(doc, margin, 8, 1.2);
 
-  // Center Title
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.setTextColor(0, 0, 0);
   doc.text(config.title, pageWidth / 2, 15, { align: 'center' });
 
-  // Right Form ID
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
   doc.text(config.id, pageWidth - margin, 16, { align: 'right' });
 
-  // Header Line
   doc.setLineWidth(0.4);
   doc.setDrawColor(0, 0, 0);
   doc.line(margin, 25, pageWidth - margin, 25);
@@ -80,7 +144,6 @@ const renderReportForm = (doc: jsPDF, request: MovementRequest, storekeeperName:
 
   drawReportHeader(doc, request.type);
   
-  // Info Fields
   doc.setFontSize(9);
   const fields = [
     { label: 'MARKAS/ WORKSHOP', value: request.base },
@@ -122,7 +185,7 @@ const renderReportForm = (doc: jsPDF, request: MovementRequest, storekeeperName:
     doc.setDrawColor(0, 0, 0);
     doc.line(margin, y + 1.5, pageWidth - margin, y + 1.5);
     
-    doc.setDrawColor(220, 220, 220); // Faint gray
+    doc.setDrawColor(220, 220, 220);
     doc.setLineWidth(0.1);
     doc.line(margin, y + 8, pageWidth - margin, y + 8);
     doc.line(margin, y + 15, pageWidth - margin, y + 15);
@@ -162,13 +225,11 @@ const renderQF100Form = (doc: jsPDF, request: MovementRequest, storekeeperName: 
   const pageWidth = doc.internal.pageSize.width;
   const isBorrow = request.type === RequestType.BORROW;
 
-  // 1. Top Metadata Lines
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.text('REMACO IMS - REMACO (MR (MS)) - QMS - 8.1 - WI - 026', margin, 10);
   doc.text('REMACO IMS - REMACO (MR (MS)) - QMS - 8.1 - WI - 026 - QR - 001', pageWidth - margin, 10, { align: 'right' });
 
-  // 2. Main Header Section (Using branding helper)
   drawBranding(doc, margin, 13, 1.1);
 
   doc.setFontSize(10);
@@ -183,7 +244,6 @@ const renderQF100Form = (doc: jsPDF, request: MovementRequest, storekeeperName: 
   doc.setLineWidth(0.5);
   doc.line(margin, 30, pageWidth - margin, 30);
 
-  // 3. Info Block
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10.5);
   const startY = 38;
@@ -204,7 +264,6 @@ const renderQF100Form = (doc: jsPDF, request: MovementRequest, storekeeperName: 
     doc.text(f.value.toUpperCase(), margin + labelW, y);
   });
 
-  // 4. Main Table
   const headers = [['BIL.', 'PERALATAN', 'CATATAN', 'KUANTITI\nKELUAR', 'TARIKH\nDIPULANGKAN', 'KUANTITI\nMASUK']];
   const tableBody = [];
   const MAX_ROWS = 13;
@@ -251,10 +310,10 @@ const renderQF100Form = (doc: jsPDF, request: MovementRequest, storekeeperName: 
   const sigBody = [
     ['DIKELUARKAN', 'NAMA DAN T/TANGAN JURUTERA KANAN MARKAS /\nPENGURUS KANAN WORKSHOP / ODK', managerName || 'AUTHORIZED MANAGER'],
     ['', 'NAMA DAN T/TANGAN PENGGUNA\n(PENGURUS KERJA/ POMEN/ KETUA KUMPULAN)', isBorrow ? request.staffName : ''],
-    ['', 'NAMA & T/TANGAN PENJAGA PERALATAN MARKAS /\nWORKSHOP', isBorrow ? storekeeperName : 'AUTHORIZED STOREKEEPER'],
+    ['', 'NAMA & T/TANGAN PENGGUNA\n(PENJAGA PERALATAN MARKAS /\nWORKSHOP)', isBorrow ? storekeeperName : 'AUTHORIZED STOREKEEPER'],
     ['DIPULANGKAN', 'NAMA DAN T/TANGAN JURUTERA KANAN MARKAS /\nPENGURUS KANAN WORKSHOP / ODK', !isBorrow ? managerName : ''],
     ['', 'NAMA DAN T/TANGAN PENGGUNA\n(PENGURUS KERJA/ POMEN/ KETUA KUMPULAN)', !isBorrow ? request.staffName : ''],
-    ['', 'NAMA & T/TANGAN PENJAGA PERALATAN MARKAS /\nWORKSHOP', !isBorrow ? storekeeperName : '']
+    ['', 'NAMA & T/TANGAN PENGGUNA\n(PENJAGA PERALATAN MARKAS /\nWORKSHOP)', !isBorrow ? storekeeperName : '']
   ];
 
   autoTable(doc, {

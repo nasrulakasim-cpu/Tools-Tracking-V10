@@ -24,7 +24,6 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// Fix: Imported React at line 1 to resolve 'Cannot find namespace React' when using React.FC
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -36,12 +35,37 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const fetchData = async () => {
       setLoading(true);
       try {
+        // Fetch Users
         const { data: userData } = await supabase.from('users').select('*');
         setUsers((userData as User[]) || MOCK_USERS);
 
-        const { data: invData } = await supabase.from('inventory').select('*');
-        setInventory((invData as InventoryItem[]) || INITIAL_INVENTORY);
+        // Fetch Inventory (Fixing the 1000 item limit)
+        let allInventory: InventoryItem[] = [];
+        let from = 0;
+        const step = 1000;
+        let hasMore = true;
 
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('inventory')
+            .select('*')
+            .range(from, from + step - 1);
+
+          if (error) throw error;
+          if (data && data.length > 0) {
+            allInventory = [...allInventory, ...(data as InventoryItem[])];
+            if (data.length < step) {
+              hasMore = false;
+            } else {
+              from += step;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+        setInventory(allInventory.length > 0 ? allInventory : INITIAL_INVENTORY);
+
+        // Fetch Requests
         const { data: reqData } = await supabase.from('requests').select('*').order('timestamp', { ascending: false });
         setRequests((reqData as MovementRequest[]) || []);
       } catch (error) {
@@ -242,7 +266,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } else {
         newStatus = RequestStatus.APPROVED;
         processorUpdates.managerId = user.id;
-        // Manager can also update/refine the reason if it's during their turn
         if (reason) processorUpdates.reportReason = reason;
       }
     } else {

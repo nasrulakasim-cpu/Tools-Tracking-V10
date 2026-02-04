@@ -2,14 +2,15 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Layout, RemacoLogo } from './components/Layout';
 import { InventoryTable } from './components/InventoryTable';
-import { UserRole, RequestStatus, RequestType, MovementRequest, InventoryItem, User } from './types';
-import { generateQF21, generateEmptyQF, getFormConfig } from './services/pdfService';
+import { UserRole, RequestStatus, RequestType, MovementRequest, InventoryItem, User, BaseStats } from './types';
+import { generateQF21, generateEmptyQF, getFormConfig, generateSummaryReport } from './services/pdfService';
 import { 
   Check, X, Package, Clock, ArrowRightLeft, 
   AlertCircle, Download, Upload, UserPlus, Users, 
   Calendar, MapPin, Briefcase, Lock, User as UserIcon, 
   TrendingUp, AlertTriangle, Trash2, Home, BarChart3, Layers,
-  UserCheck, Search, ShieldCheck, FileText, Eye, MessageSquare
+  UserCheck, Search, ShieldCheck, FileText, Eye, MessageSquare,
+  FileBarChart
 } from 'lucide-react';
 import { SYSTEM_BASES } from './constants';
 
@@ -218,16 +219,6 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, subtext, icon: Icon, 
   </div>
 );
 
-interface BaseStats {
-  baseName: string;
-  totalItems: number;
-  skrapCount: number;
-  rosakCount: number;
-  inUseCount: number;
-  lostCount: number;
-  okCount: number;
-}
-
 const Dashboard = () => {
   const { user, requests, inventory } = useApp();
   
@@ -408,9 +399,18 @@ const Dashboard = () => {
           
           {/* SYSTEM SUMMARY (Grand Totals) */}
           <div className="space-y-4">
-            <div className="flex items-center gap-3">
-               <Layers className="w-6 h-6 text-tnbBlue" />
-               <h3 className="text-lg font-black text-gray-800 uppercase tracking-widest border-b-2 border-tnbBlue pb-1">System-wide Summary (All Bases)</h3>
+            <div className="flex items-center justify-between border-b-2 border-tnbBlue pb-2">
+               <div className="flex items-center gap-3">
+                  <Layers className="w-6 h-6 text-tnbBlue" />
+                  <h3 className="text-lg font-black text-gray-800 uppercase tracking-widest">System-wide Summary (All Bases)</h3>
+               </div>
+               <button 
+                  onClick={() => generateSummaryReport(adminBaseStats || [], grandTotalStats)}
+                  className="flex items-center gap-2 px-4 py-2 bg-tnbBlue text-white rounded-lg text-xs font-black shadow-lg hover:bg-blue-900 transition-all transform active:scale-95"
+               >
+                  <FileBarChart className="w-4 h-4" />
+                  GENERATE PDF SUMMARY
+               </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
               <StatCard 
@@ -672,10 +672,9 @@ const HistoryPage = () => {
   });
 
   const handleApprove = (req: MovementRequest) => {
-    // If it's a damage/scrap/lost request, we need a reason
     if ([RequestType.ROSAK, RequestType.SCRAP, RequestType.LOST].includes(req.type)) {
       setApprovingRequest(req);
-      setReportReason(req.reportReason || ''); // Start with whatever is there
+      setReportReason(req.reportReason || '');
     } else {
       executeProcessRequest(req, true);
     }
@@ -687,9 +686,7 @@ const HistoryPage = () => {
       const storekeeperName = user.role === UserRole.STOREKEEPER ? user.name : (users.find(u => u.id === req.storekeeperId)?.name || 'Authorized Storekeeper');
       const managerName = user.role === UserRole.BASE_MANAGER ? user.name : (users.find(u => u.id === req.managerId)?.name || '');
       
-      // Auto generate PDF after final approval or certain types of verifications
       if ((user.role === UserRole.BASE_MANAGER && (req.type === RequestType.BORROW || req.type === RequestType.ROSAK || req.type === RequestType.SCRAP || req.type === RequestType.LOST)) || (user.role === UserRole.STOREKEEPER && req.type === RequestType.RETURN)) {
-        // Refetch or use latest data
         const updatedReq = { ...req, status: approved ? (user.role === UserRole.STOREKEEPER ? RequestStatus.PENDING_MANAGER : RequestStatus.APPROVED) : RequestStatus.REJECTED, reportReason: reason || req.reportReason };
         generateQF21(updatedReq as MovementRequest, inventory, storekeeperName, managerName);
       }
@@ -752,7 +749,6 @@ const HistoryPage = () => {
         </div>
       )}
 
-      {/* Approve Reason Modal */}
       {approvingRequest && (
         <div className="fixed inset-0 bg-gray-900/70 backdrop-blur-md flex items-center justify-center z-[200] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
@@ -792,7 +788,6 @@ const HistoryPage = () => {
         </div>
       )}
 
-      {/* Item Viewer Modal */}
       {viewItemsRequest && (
         <div className="fixed inset-0 bg-gray-900/70 backdrop-blur-md flex items-center justify-center z-[150] p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
@@ -832,7 +827,6 @@ const HistoryPage = () => {
         </div>
       )}
 
-      {/* ADMIN TEMPLATE SECTION */}
       {user.role === UserRole.ADMIN && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center gap-3 mb-4">
